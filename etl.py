@@ -137,7 +137,7 @@ class DataProcessor(object):
         # write time table to parquet files partitioned by year and month
         
         time_table_path = f'{self.output_path}/log_data/time/'
-        time_table = time_table.write.partitionBy('year', 'month').parquet(time_table_path)
+        time_table.write.partitionBy('year', 'month').parquet(time_table_path)
 
         # read in song data to use for songplays table
         song_path = f'{self.input_path}/song_data/*/*/*/*.json'
