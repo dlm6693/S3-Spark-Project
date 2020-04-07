@@ -3,20 +3,30 @@ from datetime import datetime
 import os
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import udf, col, year, month, dayofmonth, hour, weekofyear, dayofweek, monotonically_increasing_id
-import logging
 
 
-config = configparser.ConfigParser()
-config.read('dl.cfg')
 
-os.environ['AWS_ACCESS_KEY_ID']=config['AWS']['AWS_ACCESS_KEY_ID']
-os.environ['AWS_SECRET_ACCESS_KEY']=config['AWS']['AWS_SECRET_ACCESS_KEY']
 
 
 class DataProcessor(object):
     
     def __init__(self, input_path, output_path):
+        """
+        Description:  The intitialization method for the DataProcessor class. This establishes 
+        the connection to AWS and sets a number of key variables for debugging purposes.
         
+        Parameters:
+            input_path: Path to S3 bucket where data will be pulled from
+            output_path: Path to S3 bucket where processed data will be stored
+        """
+        
+        #setting up AWS configuration
+        self.config = configparser.ConfigParser()
+        self.config.read('dl.cfg')
+        os.environ['AWS_ACCESS_KEY_ID']=self.config['AWS']['AWS_ACCESS_KEY_ID']
+        os.environ['AWS_SECRET_ACCESS_KEY']=self.config['AWS']['AWS_SECRET_ACCESS_KEY']
+        
+        #saving some variables, creating the Spark session and updating parameters of that session accordingly
         self.input_path = input_path
         self.output_path = output_path
         self.access_key = os.environ['AWS_ACCESS_KEY_ID']
@@ -32,6 +42,12 @@ class DataProcessor(object):
 
 
     def process_song_data(self):
+        """
+        Description: Method that processes raw song data and stores in artist and partitioned song tables
+        
+        Parameters:
+            self: Instance of DataProcessor 
+        """
         # get filepath to song data file
         song_data = f'{self.input_path}/song_data/*/*/*/*.json'
 
@@ -53,7 +69,7 @@ class DataProcessor(object):
         songs_table_path = f'{self.output_path}/song_data/songs/'
         
         songs_table = songs_table.write.partitionBy('year','artist_id')\
-                                                    .parquet(songs_table_path)
+                                                    .parquet(songs_table_path, 'overwrite')
 
         # extract columns to create artists table
         
@@ -70,10 +86,16 @@ class DataProcessor(object):
         
         artists_table_path = f'{self.output_path}/song_data/artists/'
         
-        artists_table = artists_table.write.parquet(artists_table_path)
+        artists_table = artists_table.write.parquet(artists_table_path, 'overwrite')
 
 
     def process_log_data(self):
+        """
+        Description: Method that processes raw log data and stores as user, time and songplays tables
+        
+        Parameters:
+            self: Instance of DataProcessor 
+        """
         # get filepath to log data file
         log_data = f'{self.input_path}/log_data/2018/11/*.json'
 #         log_data = f'{self.input_path}/log_data/*.json'
@@ -96,7 +118,7 @@ class DataProcessor(object):
         # write users table to parquet files
         user_table_path = f'{self.output_path}/log_data/users/'
         
-        users_table = df.write.parquet(user_table_path)
+        users_table = df.write.parquet(user_table_path, 'overwrite')
 
          # create datetime column from original timestamp column 
         get_datetime = udf(lambda ts: datetime.fromtimestamp(ts/1000).strftime("%Y-%m-%d %H:%M:%S"))
@@ -146,19 +168,19 @@ class DataProcessor(object):
                                     .parquet(songplays_table_path)
         
     def main(self):
+        
+        """
+        Description: Method that runs the above two
+        
+        Parameters:
+            self: Instance of DataProcessor 
+        """
 
         self.process_song_data()    
         self.process_log_data()
 
 
 if __name__ == "__main__":
-    logging.basicConfig(filename='logs.log',
-                            filemode='a',
-                            format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
-                            datefmt='%H:%M:%S',
-                            level=logging.DEBUG)
-
-    logging.info("Running S3 processor")
     
     dp = DataProcessor(
                         input_path = "s3a://udacity-dend/", 
