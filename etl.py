@@ -75,8 +75,8 @@ class DataProcessor(object):
 
     def process_log_data(self):
         # get filepath to log data file
-#         log_data = f'{self.input_path}/log_data/2018/11/*.json'
-        log_data = f'{self.input_path}/log_data/*.json'
+        log_data = f'{self.input_path}/log_data/2018/11/*.json'
+#         log_data = f'{self.input_path}/log_data/*.json'
         # read log data file
         df = self.spark.read.json(log_data)
 
@@ -122,11 +122,13 @@ class DataProcessor(object):
         songs = self.spark.read.json(song_path)
 
         # extract columns from joined song and log datasets to create songplays table 
-        songplays_table = df.alias('logs').join(songs.alias('songs'), 
+        songplays = df.alias('logs').join(songs.alias('songs'), 
                                             (col('logs.song') == col('songs.title')) & (col('logs.artist') == col('songs.artist_name'))
-                                               )\
+                                               ).join(time_table.alias('times'), col('logs.start_time') == col('times.start_time'))\
                                             .selectExpr(
                                             'logs.start_time',
+                                            'times.year',
+                                            'times.month',
                                             'logs.userId as user_id',
                                             'logs.level',
                                             'songs.song_id',
@@ -140,9 +142,9 @@ class DataProcessor(object):
         # write songplays table to parquet files partitioned by year and month
         
         songplays_table_path = f'{self.output_path}/log_data/songplays/'
-        songplays_table = songplays.write.partitionBy(year('start_time'), month('start_time'))\
-                                    .parquet(song_plays_table_path)
-
+        songplays_table = songplays.write.partitionBy('year', 'month')\
+                                    .parquet(songplays_table_path)
+        
     def main(self):
 
         self.process_song_data()    
@@ -159,7 +161,7 @@ if __name__ == "__main__":
     logging.info("Running S3 processor")
     
     dp = DataProcessor(
-                        input_path = "./data/", 
+                        input_path = "s3a://udacity-dend/", 
                         output_path = "s3a://data-lake-project-dlm/"
                         )
     dp.main()
